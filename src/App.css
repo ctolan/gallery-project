@@ -5,6 +5,14 @@
   text-align: center;
 }
 
+.gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .logo {
   height: 6em;
   padding: 1.5em;

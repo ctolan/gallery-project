@@ -18,6 +18,8 @@ Workflow - add new images locally
      { id: '3', url: '/images/20250920_090846.jpg', title: 'New Image 3' },
    ];
 
+This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The in-app photo draft is local-only until the authenticated upload and parent-review backend is configured. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
+
 Local testing
 - Install dependencies (if needed):
 

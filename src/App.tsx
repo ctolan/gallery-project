@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Container, Dialog, DialogContent, DialogTitle } from '@mui/material'
 import { ImageGallery } from './components/ImageGallery'
+import { ArtworkUploadDraft } from './components/ArtworkUploadDraft'
 import './App.css'
 
 // Using local images from public/images folder
@@ -19,7 +20,10 @@ function App() {
 
   return (
     <Container maxWidth="xl">
-      <h1>Image Gallery</h1>
+      <header className="gallery-header">
+        <h1>Image Gallery</h1>
+        <ArtworkUploadDraft />
+      </header>
       <ImageGallery images={galleryImages} onImageClick={handleImageClick} />
       
       <Dialog
