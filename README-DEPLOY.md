@@ -10,7 +10,7 @@ Files changed
 
 Workflow - add new images locally
 1. Put your new image files in `public/images/` (overwrite existing filenames or add new names).
-2. Update `src/App.tsx` to reference the new filenames in the `galleryImages` array. Example:
+2. Update the `galleryImages` array in `src/pages/GalleryPage.tsx` to reference the new filenames. Example:
 
    const galleryImages = [
      { id: '1', url: '/images/20250920_090826.jpg', title: 'New Image 1' },
@@ -18,7 +18,7 @@ Workflow - add new images locally
      { id: '3', url: '/images/20250920_090846.jpg', title: 'New Image 3' },
    ];
 
-This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The in-app photo draft is local-only until the authenticated upload and parent-review backend is configured. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
+This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The `/submit` page lets Patrick prepare a resized, metadata-stripped photo draft on his phone, but sending it is disabled until the authenticated upload and parent-review backend is deployed. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
 
 Local testing
 - Install dependencies (if needed):
