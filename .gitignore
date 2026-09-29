@@ -26,14 +26,16 @@ dist-ssr
 # Node
 node_modules/
 npm-debug.log
-package-lock.json
 
 # Local env / secrets
 .env
 *.env
 *.secret
- credentials*.json
+credentials*.json
 service-account*.json
+*.pem
+*.key
+.env.*
 
 # Build / output
 dist/
@@ -44,6 +46,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Docker / cloud
-.dockerignore
+# Local notes / cloud
+vscode-context.txt
 .gcloud/
