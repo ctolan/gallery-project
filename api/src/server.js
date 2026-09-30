@@ -28,8 +28,8 @@ function readConfig(environment = process.env) {
   const submitterEmail = environment.SUBMITTER_EMAIL.trim().toLowerCase()
   const reviewerEmail = environment.REVIEWER_EMAIL.trim().toLowerCase()
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!validEmail.test(submitterEmail) || !validEmail.test(reviewerEmail) || submitterEmail === reviewerEmail) {
-    throw new Error('Submitter and reviewer must be distinct, valid email addresses.')
+  if (!validEmail.test(submitterEmail) || !validEmail.test(reviewerEmail)) {
+    throw new Error('Submitter and reviewer must be valid email addresses.')
   }
 
   if (environment.PENDING_BUCKET === environment.APPROVED_BUCKET) {

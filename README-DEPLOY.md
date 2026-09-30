@@ -18,7 +18,7 @@ Workflow - add new images locally
      { id: '3', url: '/images/20250920_090846.jpg', title: 'New Image 3' },
    ];
 
-This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented in this branch, but cloud resources are not deployed; sending remains disabled until the authentication, authorization, storage, and approval flow is provisioned and end-to-end tested. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
+This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented. The API is deployed, but Firebase Google sign-in still needs to be enabled in the Console, approved media remains private, and frontend sending remains disabled pending authenticated end-to-end checks. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
 
 Local testing
 - Install dependencies (if needed):

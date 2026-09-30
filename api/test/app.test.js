@@ -220,6 +220,19 @@ after(async () => {
 })
 
 describe('artwork API access and review workflow', () => {
+  it('allows one explicitly configured account to hold both temporary roles', async () => {
+    const originalReviewerEmail = config.reviewerEmail
+    config.reviewerEmail = config.submitterEmail
+    try {
+      const response = await request('/api/review/submissions', {
+        headers: { Authorization: 'Bearer submitter-token' },
+      })
+      assert.equal(response.status, 200)
+    } finally {
+      config.reviewerEmail = originalReviewerEmail
+    }
+  })
+
   it('rejects an unauthenticated submission', async () => {
     const response = await submitPhoto(null)
     assert.equal(response.status, 401)
