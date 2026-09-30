@@ -30,7 +30,7 @@ On 2026-09-30, `ctolan@gmail.com` verified project `gallery-app-457314` (`Galler
 | Private pending/rejected bucket | `gs://gallery-app-457314-artwork-pending`, `europe-west1`, uniform access, public-access prevention enforced, no soft-delete retention, 14-day lifecycle on `pending/` and `rejected/` |
 | Approved-media bucket | `gs://gallery-app-457314-artwork-approved`, `europe-west1`, uniform access; private, no public grant; approved images are read through the API proxy |
 | Runtime service account | `artwork-api-runtime@gallery-app-457314.iam.gserviceaccount.com`, no key created |
-| Cloud Run API | `artwork-api`, `europe-west1`; URL `https://artwork-api-4bigtfzbma-ew.a.run.app`; service min instances 0, max 2, 1 CPU, 1 GiB, concurrency 1, 120s timeout; revision `artwork-api-00002-4sz` |
+| Cloud Run API | `artwork-api`, `europe-west1`; URL `https://artwork-api-4bigtfzbma-ew.a.run.app`; service min instances 0, max 2, 1 CPU, 1 GiB, concurrency 1, 120s timeout; revision `artwork-api-00003-veb` |
 | Gallery frontend | Cloud Run service `gallery-app`, `us-central1`; production URL `https://patrick.tolan.ie`; revision `gallery-app-00016-lap` (100% traffic); image `gcr.io/gallery-app-457314/gallery-app:artwork-ui-csp2-20260930-1554`; custom Firebase auth domain and same-origin helper proxy configured; `VITE_ARTWORK_UPLOAD_ENABLED=true` |
 
 Firebase, Identity Toolkit, Firestore, and Firebase Rules APIs are enabled. Cloud Run, Cloud Build, and Artifact Registry APIs were already enabled. Firebase project registration added Firebase-managed service-agent bindings; provisioning did not change unrelated buckets or Firestore databases. The gallery frontend was subsequently updated only in the explicitly authorized deployment described above.
