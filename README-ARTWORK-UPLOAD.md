@@ -14,59 +14,47 @@
 
 **Not enabled in this branch:** there is no cloud API URL/Firebase client configuration committed, and the default upload flag is `false`. Client limits are only usability checks; a malicious client can bypass them. The API independently enforces actual type, file size, pixel count, dimensions/output encoding, role, and request constraints. Cloud Storage access policies and Firestore rules must be deployed before turning uploads on.
 
-## Provisioning state — not yet performed
+## Provisioning state — partially provisioned; not deployed
 
-The requested target project is `gallery-app-457314`; the documented live site `https://patrick.tolan.ie` responds successfully. The Google Cloud CLI is installed in this workspace at `~/.local/share/google-cloud-sdk/bin/gcloud` (version 587.0.0), but **no Google Cloud account is authenticated here**. As a result, the project/IAM has not been verified and **no GCP/Firebase resources have been created or changed, no service has been deployed, and no end-to-end GCP tests have been run**.
+On 2026-09-30, `ctolan@gmail.com` verified project `gallery-app-457314` (`Gallery-app`, ACTIVE; project number `151307084226`) and Owner access. Firebase project registration and the foundational isolated storage/database resources are complete. **No Cloud Run service or frontend deployment exists yet. Google sign-in is not configured, and uploads remain disabled.**
 
-The following resource names are proposed, not confirmed or provisioned:
-
-| Resource | Proposed identifier |
+| Resource | Current state |
 |---|---|
-| Cloud Run service | `artwork-api`, region `europe-west1` |
-| Pending/rejected bucket | `gallery-app-457314-artwork-pending` |
-| Public approved bucket | `gallery-app-457314-artwork-approved` |
-| Runtime identity | `artwork-api-runtime@gallery-app-457314.iam.gserviceaccount.com` |
-| Firestore | `(default)`, Native mode, `europe-west1` |
-| Public gallery origin | `https://patrick.tolan.ie` |
-| Cloud Run URL | Not assigned until deployment |
+| Firebase project | `gallery-app-457314`, registered; Firebase also reports Hosting site `gallery-app-457314` |
+| Firebase web app | `1:151307084226:web:d22cad73f020f0b176b65b`, “Gallery artwork upload and review” |
+| Firebase Authentication | Google provider not enabled; Identity Toolkit reports no Auth configuration yet |
+| Firestore `(default)` | Pre-existing `nam5`, US, **Datastore mode**; untouched |
+| Firestore artwork database | `projects/gallery-app-457314/databases/artwork`, Native/Standard, `europe-west1`, deletion protection enabled |
+| Firestore rules | Deny-all release deployed to `cloud.firestore/artwork`; anonymous REST read was verified to return 403 |
+| Firestore expiry | TTL on `submissions.expiresAt` is ACTIVE |
+| Private pending/rejected bucket | `gs://gallery-app-457314-artwork-pending`, `europe-west1`, uniform access, public-access prevention enforced, no soft-delete retention, 14-day lifecycle on `pending/` and `rejected/` |
+| Approved-media bucket | `gs://gallery-app-457314-artwork-approved`, `europe-west1`, uniform access; no public grant yet |
+| Runtime service account | `artwork-api-runtime@gallery-app-457314.iam.gserviceaccount.com`, no key created |
+| Cloud Run API | Not deployed; URL not assigned |
+| Gallery frontend | Not deployed; `VITE_ARTWORK_UPLOAD_ENABLED=false` |
 
-The region is proposed to keep the API, Firestore, and private storage together in Europe. Verify it against the existing project's location/billing policy before creating the database or buckets. Do not proceed if an existing default Firestore database is in a different region, the project description/account is unexpected, the bucket names already belong to unrelated resources, or public bucket access is prohibited by organization policy.
+Firebase, Identity Toolkit, Firestore, and Firebase Rules APIs are enabled. Cloud Run, Cloud Build, and Artifact Registry APIs were already enabled. Firebase project registration added Firebase-managed service-agent bindings; no unrelated existing bucket, Firestore database, or live gallery configuration was changed.
+
+The existing default database is incompatible with the Firestore SDK workflow and must not be converted, replaced, or used for the artwork API. A separate named Native database keeps the existing US Datastore-mode database untouched. The additional Native database reports `freeTier: false`; expect usage-based Firestore charges rather than assuming the free-tier allowance. Cloud Run will use `min=0`, but that does not eliminate database, storage, build, or network costs.
+
+The runtime service account has bucket-scoped `objectAdmin` on the private bucket and `objectCreator`/`objectViewer` on the approved bucket. Project custom roles limit Firestore document operations and Firebase Auth user lookup; the Firestore role is bound with an IAM condition matching only `projects/gallery-app-457314/databases/artwork`. No public grant exists on either bucket yet. The database access condition still needs to be verified from the deployed runtime before enabling submissions.
 
 ## Required human setup
 
-1. Authenticate the intended administrator in this workspace using `~/.local/share/google-cloud-sdk/bin/gcloud auth login`. Then verify `gcloud auth list` and `gcloud projects describe gallery-app-457314 --format='value(projectId,name,lifecycleState)'` before any provisioning. This branch has not run these commands because no account is authenticated.
-2. In Firebase Console, add/confirm Firebase for `gallery-app-457314`, register a web app, enable **Google** as the Firebase Authentication provider, choose the support email, and authorize `patrick.tolan.ie`. Obtain the web app's public Firebase config (`apiKey`, `authDomain`, `projectId`, `appId`). Firebase web config is public client config; never put service-account credentials in Vite variables. Google provider activation/support-email selection may require a human console step.
-3. Supply the exact Google email address for Patrick and the parent's reviewer account to the private Cloud Run runtime configuration. The API uses an exact server-side email allowlist (`SUBMITTER_EMAIL`, `REVIEWER_EMAIL`); client input/custom claims cannot grant roles. The two addresses must be distinct and Google-verified.
-4. If the project requires first-use billing acceptance or a Google OAuth consent/support contact step, complete that in the Cloud Console; no billing account or consent data is assumed here.
+1. Firebase is registered and the web app exists. In Firebase Console, enable **Google** under Authentication → Sign-in method, choose the user-facing support email, and add `patrick.tolan.ie` to authorized domains. The web app config is public client config; never put service-account credentials in Vite variables.
+2. Provide the exact Google email address for Patrick's submitter account and the parent's reviewer account. The API uses exact server-side email allowlists (`SUBMITTER_EMAIL`, `REVIEWER_EMAIL`); client input/custom claims cannot grant roles. The two addresses must be distinct and Google-verified.
+3. If the project requires OAuth consent or support-contact setup in a browser, complete that in the Cloud Console. No address or consent details have been guessed.
 
-## Provision and deploy after authentication
+## Provision and deploy
 
-All commands below are an implementation checklist, **not commands already run**. First confirm the project identity and account as above. These steps enable only Firebase Auth/Firestore/rules, Cloud Storage, Cloud Run, and Cloud Build services required for this design.
+The project/account have been verified and APIs/database/rules/buckets/identity are provisioned as recorded above. Do not repeat create steps. Remaining deployment must wait for the Google-provider, support-email, and two role-email values above.
 
-1. Enable APIs in the verified project:
+1. The required Cloud Run/Build/Artifact Registry APIs were already enabled in the verified project; no additional service APIs are needed at this stage.
 
-   ```sh
-   gcloud services enable \
-     run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
-     storage.googleapis.com firestore.googleapis.com firebase.googleapis.com \
-     identitytoolkit.googleapis.com firebaserules.googleapis.com \
-     --project=gallery-app-457314
-   ```
+2. Enable public object viewing only for the approved-media bucket when ready to deploy: grant `allUsers:roles/storage.objectViewer` to `gallery-app-457314-artwork-approved`. Never grant public access to the pending bucket. Abort if policy rejects public reads; do not weaken an organization policy.
+3. Confirm the IAM condition on the custom Firestore role works against the deployed API. If it blocks `artwork` requests, diagnose and correct the condition; do not replace it with a broad project-wide `roles/datastore.user` grant.
+4. Deploy the API with the dedicated runtime identity, `ARTWORK_DATABASE_ID=artwork`, exact bucket names and gallery origin, the two confirmed email allowlists, Node 22, `min=0`, `max=2`, one CPU, 1 GiB memory, concurrency 1, and an appropriate request timeout. Make Cloud Run invokable by browsers; application routes still enforce Firebase ID tokens and server-side roles. The only anonymous API route is `/api/gallery`.
+5. Configure the frontend with the Firebase web app's public config and deployed API URL. Keep `VITE_ARTWORK_UPLOAD_ENABLED=false`.
+6. Run real-account end-to-end checks before enabling uploads: unauthenticated submission returns 401; another account and the submitter cannot review/approve; spoofed and oversized files are rejected; pending objects are not publicly reachable; approval makes sanitized media visible in the approved catalog; rejection remains private; and the configured 14-day retention controls are active. Then deploy the static gallery update without removing/changing existing gallery content and enable uploads only after those checks pass.
 
-2. Create Firestore Native `(default)` in the agreed region only if it does not already exist. Apply `firestore.rules` with Firebase CLI (`npx firebase-tools login`, then `npx firebase-tools deploy --only firestore:rules --project gallery-app-457314`). These rules deny every direct client read/write; the API uses its narrowly scoped service identity and the Admin SDK. Enable Firestore TTL on the `submissions.expiresAt` field:
-
-   ```sh
-   gcloud firestore fields ttls update expiresAt \
-     --collection-group=submissions --enable-ttl \
-     --database='(default)' --project=gallery-app-457314
-   ```
-
-   Firestore TTL deletion is asynchronous. The storage lifecycle is the media-retention backstop.
-
-3. Create both buckets in the agreed region with uniform bucket-level access. Enforce public-access prevention on the pending bucket and apply `infra/pending-lifecycle.json`. The approved bucket contains only already-approved optimized images and has public object read; add only `allUsers:roles/storage.objectViewer` there. If organization policy rejects that binding, stop; do not weaken organization policy or expose pending objects.
-4. Create a dedicated runtime service account. Grant it `roles/datastore.user` for Firestore; `roles/storage.objectAdmin` scoped only to the private pending bucket; and `roles/storage.objectViewer` plus `roles/storage.objectCreator` scoped only to the approved bucket. `roles/firebaseauth.viewer` is needed for revoked/disabled-token checks. Do not create key files. Use an exact-origin `GALLERY_ORIGIN=https://patrick.tolan.ie`.
-5. Deploy the API from `api/` with Node 22 and `min=0`, `max=2`, one CPU, 1 GiB memory, concurrency 1, and a request timeout suitable for image re-encoding. It must be reachable by the browser, so Cloud Run ingress is public, but every submit/review route requires a verified Firebase ID token and server-side role check. `/api/gallery` is the only anonymous API route. Set `GCP_PROJECT_ID`, bucket names, exact origin, and the two email allowlist values as runtime configuration.
-6. Record the actual Cloud Run URL. Build the frontend with `VITE_ARTWORK_API_URL` and Firebase web config. Keep `VITE_ARTWORK_UPLOAD_ENABLED=false` during setup.
-7. Before enabling uploads, test with the real Firebase accounts: anonymous submission gets 401; an incorrect account and submitter cannot review/approve; claimed MIME spoof and per-file/body size excess are rejected by the API; pending URLs cannot be fetched publicly; approve publishes and exposes only sanitized media in the approved catalog; reject moves the object to `rejected/`; lifecycle deletes pending/rejected media after 14 days. Then deploy the static gallery update without removing/changing the existing live gallery and set `VITE_ARTWORK_UPLOAD_ENABLED=true` only after those checks pass.
-
-Cloud Run's minimum instance count is zero, so no API container stays warm between requests. This does not eliminate Cloud Storage, Firestore, build, network, or request charges. No live settings have been changed in this workspace.
+Cloud Run's planned minimum instance count is zero. The local test suites pass, but Docker access is unavailable in this workspace and the API has not been cloud-built or deployed. Firebase Auth provider setup, approved-bucket public grant, API deployment, real Firebase-account tests, and frontend deployment remain outstanding. No live site settings have been changed.

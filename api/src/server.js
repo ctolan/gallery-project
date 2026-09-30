@@ -10,6 +10,7 @@ function readConfig(environment = process.env) {
     'GCP_PROJECT_ID',
     'PENDING_BUCKET',
     'APPROVED_BUCKET',
+    'ARTWORK_DATABASE_ID',
     'GALLERY_ORIGIN',
     'SUBMITTER_EMAIL',
     'REVIEWER_EMAIL',
@@ -35,6 +36,10 @@ function readConfig(environment = process.env) {
     throw new Error('Pending and approved media must use separate buckets.')
   }
 
+  if (!/^[a-z][a-z0-9-]{2,61}[a-z0-9]$/.test(environment.ARTWORK_DATABASE_ID)) {
+    throw new Error('ARTWORK_DATABASE_ID must be a valid named Firestore database ID.')
+  }
+
   const port = Number(environment.PORT || 8080)
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be a valid TCP port.')
@@ -44,6 +49,7 @@ function readConfig(environment = process.env) {
     projectId: environment.GCP_PROJECT_ID,
     pendingBucketName: environment.PENDING_BUCKET,
     approvedBucketName: environment.APPROVED_BUCKET,
+    artworkDatabaseId: environment.ARTWORK_DATABASE_ID,
     galleryOrigin,
     submitterEmail,
     reviewerEmail,
@@ -60,7 +66,7 @@ export function startServer(environment = process.env) {
     )
   const app = createApp({
     auth: getAuth(firebaseApp),
-    db: getFirestore(firebaseApp),
+    db: getFirestore(firebaseApp, config.artworkDatabaseId),
     pendingBucket: getStorage(firebaseApp).bucket(config.pendingBucketName),
     approvedBucket: getStorage(firebaseApp).bucket(config.approvedBucketName),
     config,

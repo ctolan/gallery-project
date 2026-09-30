@@ -296,6 +296,13 @@ export function createApp({
           response.status(404).json({ error: 'Pending photo was not found.' })
           return
         }
+        if (
+          submission.status === 'pending_review' &&
+          dateFromFirestore(submission.expiresAt) <= now()
+        ) {
+          response.status(410).json({ error: 'Pending photo has expired.' })
+          return
+        }
         const image = submission.images.find((item) => item.id === request.params.imageId)
         if (!image) {
           response.status(404).json({ error: 'Pending photo was not found.' })

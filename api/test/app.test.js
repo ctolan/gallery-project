@@ -282,6 +282,12 @@ describe('artwork API access and review workflow', () => {
     })
     assert.deepEqual(await listed.json(), { items: [] })
 
+    const expiredImageId = db.collection('submissions').records.get(id).images[0].id
+    const preview = await request(`/api/review/submissions/${id}/images/${expiredImageId}`, {
+      headers: { Authorization: 'Bearer reviewer-token' },
+    })
+    assert.equal(preview.status, 410)
+
     const decision = await request(`/api/review/submissions/${id}/decision`, {
       method: 'POST',
       headers: {
