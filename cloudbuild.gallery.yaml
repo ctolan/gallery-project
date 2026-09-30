@@ -1,0 +1,17 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --platform=linux/amd64
+      - --build-arg=VITE_FIREBASE_API_KEY=${_VITE_FIREBASE_API_KEY}
+      - --build-arg=VITE_FIREBASE_AUTH_DOMAIN=${_VITE_FIREBASE_AUTH_DOMAIN}
+      - --build-arg=VITE_FIREBASE_PROJECT_ID=${_VITE_FIREBASE_PROJECT_ID}
+      - --build-arg=VITE_FIREBASE_APP_ID=${_VITE_FIREBASE_APP_ID}
+      - --build-arg=VITE_ARTWORK_API_URL=${_VITE_ARTWORK_API_URL}
+      - --build-arg=VITE_ARTWORK_UPLOAD_ENABLED=${_VITE_ARTWORK_UPLOAD_ENABLED}
+      - --tag=gcr.io/gallery-app-457314/gallery-app:${_IMAGE_VERSION}
+      - .
+images:
+  - gcr.io/gallery-app-457314/gallery-app:${_IMAGE_VERSION}
+options:
+  logging: CLOUD_LOGGING_ONLY

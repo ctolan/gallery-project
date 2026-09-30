@@ -18,7 +18,7 @@ Workflow - add new images locally
      { id: '3', url: '/images/20250920_090846.jpg', title: 'New Image 3' },
    ];
 
-This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented. Firebase Google sign-in is enabled and verified; approved photos are served through the API while both buckets stay private. The frontend is deployed to the existing `gallery-app` Cloud Run service (`us-central1`, revision `gallery-app-00003-qux`), but sending remains disabled pending authenticated end-to-end checks. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
+This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented. Firebase Google sign-in is enabled and verified; approved photos are served through the API while both buckets stay private. The frontend is deployed to the existing `gallery-app` Cloud Run service (`us-central1`, revision `gallery-app-00005-low`); submissions are enabled for the authorized live test. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
 
 Local testing
 - Install dependencies (if needed):
@@ -67,7 +67,7 @@ Notes: App Engine was used for a quick static deployment earlier, but Cloud Run 
 
 Deploy to Cloud Run (existing production service)
 
-The production gallery is the `gallery-app` Cloud Run service in `gallery-app-457314`, region `us-central1`, behind `patrick.tolan.ie`. The current production revision is `gallery-app-00003-qux`. Build the Vite app with the Firebase web-app configuration, `VITE_ARTWORK_API_URL=https://artwork-api-4bigtfzbma-ew.a.run.app`, and `VITE_ARTWORK_UPLOAD_ENABLED=false`; the Firebase API key is public client configuration, not a server credential. Smoke-test a tagged no-traffic revision at `/`, `/submit`, and `/review` before directing service traffic to it. Do not enable submissions until authenticated E2E checks pass.
+The production gallery is the `gallery-app` Cloud Run service in `gallery-app-457314`, region `us-central1`, behind `patrick.tolan.ie`. The current production revision is `gallery-app-00005-low`. `cloudbuild.gallery.yaml` builds the Vite app with supplied Firebase web-app configuration, `VITE_ARTWORK_API_URL=https://artwork-api-4bigtfzbma-ew.a.run.app`, and an explicit `VITE_ARTWORK_UPLOAD_ENABLED` substitution. The Firebase API key is public client configuration, not a server credential. For ordinary builds keep uploads false; true was authorized for the current live test. Smoke-test a tagged no-traffic revision at `/`, `/submit`, and `/review` before directing service traffic to it.
 
 Historical deployment commands (do not run as-is; verify image/build settings and current service configuration first):
 
