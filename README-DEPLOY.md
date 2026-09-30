@@ -1,9 +1,9 @@
 README - Build & Deploy Gallery Project
 
-This README lists the commands I ran and the files I modified during the session on 2025-09-20. Use this as a step-by-step reference for adding new images, rebuilding, and deploying both to App Engine and Cloud Run, plus mapping a custom domain.
+This README retains historical static-gallery deployment notes from 2025-09-20. Verify the active project, service, and region before using those commands. The artwork upload/auth/review design and current deployment status are documented in [README-ARTWORK-UPLOAD.md](README-ARTWORK-UPLOAD.md).
 
 Files changed
-- src/App.tsx
+- src/pages/GalleryPage.tsx
   - Updated local image references to new filenames in `public/images`.
 - app.yaml
   - Created/updated to configure App Engine static serving and set runtime to nodejs20.
@@ -18,7 +18,7 @@ Workflow - add new images locally
      { id: '3', url: '/images/20250920_090846.jpg', title: 'New Image 3' },
    ];
 
-This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The `/submit` page lets Patrick prepare a resized, metadata-stripped photo draft on his phone, but sending it is disabled until the authenticated upload and parent-review backend is deployed. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
+This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented in this branch, but cloud resources are not deployed; sending remains disabled until the authentication, authorization, storage, and approval flow is provisioned and end-to-end tested. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
 
 Local testing
 - Install dependencies (if needed):
@@ -105,7 +105,7 @@ gcloud beta run domain-mappings list --platform managed --region us-central1
 
 Files created/edited during session
 - app.yaml (created/updated)
-- src/App.tsx (updated)
+- src/pages/GalleryPage.tsx
 - README-DEPLOY.md (this file)
 
 Troubleshooting

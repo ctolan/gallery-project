@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run src",
+    "test:api": "npm --prefix api test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,6 +16,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
+    "firebase": "^12.19.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.4"

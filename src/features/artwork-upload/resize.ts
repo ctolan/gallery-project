@@ -1,4 +1,5 @@
 export const MAX_OUTPUT_DIMENSION = 2560
+export const MAX_OUTPUT_FILE_SIZE = 4 * 1024 * 1024
 export const OUTPUT_MIME_TYPE = 'image/jpeg'
 export const OUTPUT_QUALITY = 0.85
 
@@ -51,7 +52,6 @@ export function computeResizedDimensions(
 export async function optimizeArtworkPhoto(
   file: File,
   maxDimension: number = MAX_OUTPUT_DIMENSION,
-  quality: number = OUTPUT_QUALITY,
 ): Promise<OptimizedArtworkPhoto> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
 
@@ -62,25 +62,48 @@ export async function optimizeArtworkPhoto(
     )
 
     const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-
     const context = canvas.getContext('2d')
     if (!context) {
       throw new Error('Canvas 2D context is unavailable in this browser.')
     }
 
-    context.drawImage(bitmap, 0, 0, width, height)
+    let outputWidth = width
+    let outputHeight = height
+    let blob: Blob | null = null
+    const qualities = [OUTPUT_QUALITY, 0.78, 0.72, 0.66, 0.6, 0.54]
 
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, OUTPUT_MIME_TYPE, quality),
-    )
+    while (true) {
+      canvas.width = outputWidth
+      canvas.height = outputHeight
+      context.drawImage(bitmap, 0, 0, outputWidth, outputHeight)
 
-    if (!blob) {
-      throw new Error('Failed to encode the optimized photo.')
+      for (const quality of qualities) {
+        blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, OUTPUT_MIME_TYPE, quality),
+        )
+        if (!blob) {
+          throw new Error('Failed to encode the optimized photo.')
+        }
+        if (blob.size <= MAX_OUTPUT_FILE_SIZE) break
+      }
+
+      if (blob && blob.size <= MAX_OUTPUT_FILE_SIZE) break
+      if (Math.max(outputWidth, outputHeight) <= 1024) break
+      outputWidth = Math.round(outputWidth * 0.9)
+      outputHeight = Math.round(outputHeight * 0.9)
     }
 
-    return { blob, width, height, mimeType: OUTPUT_MIME_TYPE, sizeBytes: blob.size }
+    if (!blob || blob.size > MAX_OUTPUT_FILE_SIZE) {
+      throw new Error('Could not optimize this photo below the 4 MB upload limit.')
+    }
+
+    return {
+      blob,
+      width: outputWidth,
+      height: outputHeight,
+      mimeType: OUTPUT_MIME_TYPE,
+      sizeBytes: blob.size,
+    }
   } finally {
     bitmap.close()
   }

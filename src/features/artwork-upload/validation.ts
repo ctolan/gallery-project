@@ -8,7 +8,7 @@ export const MAX_ORIGINAL_FILE_SIZE = 25 * 1024 * 1024
 // Safety cap on the optimized (resized, re-encoded) photo that is actually
 // uploaded. A real server must re-validate this independently - this constant
 // only drives the browser UI, it is not a security boundary.
-export const MAX_OPTIMIZED_FILE_SIZE = 8 * 1024 * 1024
+export const MAX_OPTIMIZED_FILE_SIZE = 4 * 1024 * 1024
 
 export interface ArtworkFileMetadata {
   name: string
@@ -77,7 +77,7 @@ export function validateOptimizedPhoto(photo: {
   if (photo.sizeBytes > MAX_OPTIMIZED_FILE_SIZE) {
     return {
       valid: false,
-      reason: 'The optimized photo is still larger than the 8 MB upload limit.',
+      reason: 'The optimized photo is still larger than the 4 MB upload limit.',
     }
   }
 

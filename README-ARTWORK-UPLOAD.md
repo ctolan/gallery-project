@@ -1,138 +1,72 @@
-# Artwork upload integration draft
+# Artwork upload and review workflow
 
-## What is implemented in this repo (works today, once deployed)
+## Implemented in this branch
 
-This is a real page on the live static site, not a prototype: `/submit` (see
-`src/pages/ArtworkSubmitPage.tsx`) is a normal client-side route, reachable
-from any phone browser at `https://<your-domain>/submit` once this branch is
-built and deployed with the existing nginx/Cloud Run setup (`try_files ...
-/index.html` in `nginx.conf` already serves any path, including this one, via
-the SPA). A "Submit photos" link on the gallery (`/`) also points to it.
+- The existing public gallery remains available at `/`, with a link to `/submit`. The nginx SPA fallback already serves direct navigation to `/submit` and `/review`.
+- `/submit` is a mobile page with **Take a photo** and **Choose from library** controls, title/note fields, previews, and progress/errors. The browser accepts at most five JPEG/PNG/WebP camera originals up to 25 MB each.
+- Before upload, the browser decodes and re-encodes each image, applying orientation and stripping EXIF/GPS metadata, downscaling to at most 2560 px on the longest side. It retries JPEG compression and, if needed, reduces dimensions further until the optimized file is at most 4 MB. Only optimized blobs and object-URL previews are retained; original file bytes and filenames are not sent or stored.
+- The browser gateway sends the optimized blobs using Firebase ID-token bearer auth. The submit button is enabled only when both `VITE_ARTWORK_API_URL` is configured and `VITE_ARTWORK_UPLOAD_ENABLED=true`.
+- `/review` provides an authenticated pending-image review UI. It fetches private previews through the API, then offers approve/publish or reject; a partially completed publishing decision can be retried.
+- `api/` contains the separate Node 22 Cloud Run API. It verifies Firebase ID tokens, checks a server-side email allowlist for submitter/reviewer roles, independently decodes and re-encodes images with Sharp, and stores only sanitized output. Its pending/review routes are authenticated; the public catalog returns approved records only.
+- Approval is an explicit server-side transition, audited in Firestore. Rejection moves media to a private rejected prefix and resets its 14-day storage/metadata expiry. Pending uploads expire 14 days after creation. Approved media has no expiry.
+- Firestore rules deny all direct client access. `infra/pending-lifecycle.json` configures the 14-day storage lifecycle for both `pending/` and `rejected/` prefixes.
+- Automated tests cover unauthenticated submission rejection, server-side byte limits and MIME/content spoofing, non-reviewer approval rejection, pending-media privacy, idempotent review transitions, rejected expiry metadata, approval-only public catalog visibility, image resize/re-encoding, and metadata removal.
 
-On that page, entirely in the browser, before anything is sent anywhere:
+**Not enabled in this branch:** there is no cloud API URL/Firebase client configuration committed, and the default upload flag is `false`. Client limits are only usability checks; a malicious client can bypass them. The API independently enforces actual type, file size, pixel count, dimensions/output encoding, role, and request constraints. Cloud Storage access policies and Firestore rules must be deployed before turning uploads on.
 
-- **Capture or choose photos.** Two buttons: "Take a photo" (`capture="environment"`,
-  opens the phone camera) and "Choose from library" (`multiple`, opens the
-  photo picker). Up to 5 photos per draft.
-- **Accept real camera originals.** Each original may be up to 25 MB (typical
-  modern phone camera JPEGs/HEIC-converted-JPEGs fit well under this).
-- **Resize and re-encode client-side** (`src/features/artwork-upload/resize.ts`).
-  `createImageBitmap` decodes the photo (applying any EXIF rotation via
-  `imageOrientation: 'from-image'`), a `<canvas>` downsizes it so the longest
-  side is at most **2560px** (smaller photos are never upscaled), and
-  `canvas.toBlob` re-encodes it as JPEG. Because the canvas only ever holds
-  decoded pixels, re-encoding through it drops EXIF metadata as a side
-  effect - including GPS/location - without needing a metadata-stripping
-  library.
-- **Discard the original.** The original `File` is only referenced inside the
-  resize call; once it resolves, this page keeps and previews only the
-  resized, metadata-stripped blob. The user has explicitly agreed the
-  original does not need to be retained, on this device or anywhere else.
-- **Validate before and after resizing**
-  (`src/features/artwork-upload/validation.ts`): original format/size checks
-  before resizing, and a post-resize size/format sanity check before the
-  (currently disabled) submit button would be usable.
+## Provisioning state — not yet performed
 
-None of this calls a server. The "Send for parent approval" button is
-**permanently disabled** in this draft - there is no upload endpoint to call
-yet, and this code intentionally does not fake one. The typed contracts for
-that future call live in `src/features/artwork-upload/contracts.ts`
-(`ArtworkUploadGateway`, `ArtworkReviewGateway`), built around the optimized
-photo shape (`ArtworkDraftPhoto`/`OptimizedArtworkPhoto`), not the original
-file.
+The requested target project is `gallery-app-457314`; the documented live site `https://patrick.tolan.ie` responds successfully. The Google Cloud CLI is installed in this workspace at `~/.local/share/google-cloud-sdk/bin/gcloud` (version 587.0.0), but **no Google Cloud account is authenticated here**. As a result, the project/IAM has not been verified and **no GCP/Firebase resources have been created or changed, no service has been deployed, and no end-to-end GCP tests have been run**.
 
-**Important:** every limit above (file count, 25 MB original cap, 2560px,
-8 MB optimized cap, accepted MIME types) is client-side UX only. None of it
-is an enforceable security boundary - a modified or scripted client can send
-anything. The backend below must independently re-validate everything and
-must be the only thing that decides what is safe to store or publish.
+The following resource names are proposed, not confirmed or provisioned:
 
-## What requires cloud deployment (not deployed, not provisioned)
+| Resource | Proposed identifier |
+|---|---|
+| Cloud Run service | `artwork-api`, region `europe-west1` |
+| Pending/rejected bucket | `gallery-app-457314-artwork-pending` |
+| Public approved bucket | `gallery-app-457314-artwork-approved` |
+| Runtime identity | `artwork-api-runtime@gallery-app-457314.iam.gserviceaccount.com` |
+| Firestore | `(default)`, Native mode, `europe-west1` |
+| Public gallery origin | `https://patrick.tolan.ie` |
+| Cloud Run URL | Not assigned until deployment |
 
-Use Firebase Authentication with a private Cloud Run API in the existing
-Google Cloud project. Verify Firebase ID tokens server-side with
-`firebase-admin`; store submission metadata in Firestore and the optimized
-pending image in a private Cloud Storage bucket; re-validate/re-encode with
-`sharp` server-side too. This fits the existing Google Cloud hosting and
-static frontend without exposing storage credentials or accepting uploads at
-the nginx layer.
+The region is proposed to keep the API, Firestore, and private storage together in Europe. Verify it against the existing project's location/billing policy before creating the database or buckets. Do not proceed if an existing default Firestore database is in a different region, the project description/account is unexpected, the bucket names already belong to unrelated resources, or public bucket access is prohibited by organization policy.
 
-Implement the gateways in `contracts.ts` only after the Firebase project, API
-origin, and authorization policy below are agreed and configured. Do not
-replace them with unauthenticated direct uploads or client-writable
-Firestore/Storage rules.
+## Required human setup
 
-### Request and approval flow
+1. Authenticate the intended administrator in this workspace using `~/.local/share/google-cloud-sdk/bin/gcloud auth login`. Then verify `gcloud auth list` and `gcloud projects describe gallery-app-457314 --format='value(projectId,name,lifecycleState)'` before any provisioning. This branch has not run these commands because no account is authenticated.
+2. In Firebase Console, add/confirm Firebase for `gallery-app-457314`, register a web app, enable **Google** as the Firebase Authentication provider, choose the support email, and authorize `patrick.tolan.ie`. Obtain the web app's public Firebase config (`apiKey`, `authDomain`, `projectId`, `appId`). Firebase web config is public client config; never put service-account credentials in Vite variables. Google provider activation/support-email selection may require a human console step.
+3. Supply the exact Google email address for Patrick and the parent's reviewer account to the private Cloud Run runtime configuration. The API uses an exact server-side email allowlist (`SUBMITTER_EMAIL`, `REVIEWER_EMAIL`); client input/custom claims cannot grant roles. The two addresses must be distinct and Google-verified.
+4. If the project requires first-use billing acceptance or a Google OAuth consent/support contact step, complete that in the Cloud Console; no billing account or consent data is assumed here.
 
-1. Patrick signs in with an enabled Firebase Authentication account on his
-   phone. The page obtains an ID token from Firebase and sends it as a
-   bearer token, together with the already-optimized photo(s), title, and
-   note, to a dedicated Cloud Run API.
-2. The API verifies the token and an explicit `submitter` role. It
-   independently re-checks format, dimensions, and size (do not trust that
-   the client actually resized/stripped metadata); it caps title/note length,
-   file count, and request body size; it decodes and re-encodes the image
-   server-side (dropping any metadata that survived) before writing it
-   anywhere.
-3. The API generates opaque object names and writes only the sanitized output
-   to a private pending-review Storage prefix. It stores title, note,
-   submitter identity, timestamps, and `pending_review` status in Firestore.
-   Reject unexpected fields; never persist location/EXIF metadata.
-4. A parent signs in with a distinct `reviewer` role. An authenticated review
-   endpoint lists pending submissions and performs an explicit
-   approve/reject transition. Only the server may perform this transition;
-   log the actor and time and make it idempotent.
-5. On approval, the API copies the sanitized image to a separate public
-   approved-media location and adds it to the approved gallery catalog. The
-   public catalog must query only approved records. Pending objects and
-   metadata remain private and must never be reachable through a public
-   bucket, static asset path, or public API response.
-6. The gallery can fetch the approved catalog from the API once configured.
-   Keep the current checked-in gallery (`src/pages/GalleryPage.tsx`) as the
-   fallback; do not merge pending records into it.
+## Provision and deploy after authentication
 
-Use a narrowly scoped Cloud Run service account (private pending-object and
-Firestore access only; publish permission limited to the approved-media
-location). Deny browser access to Firestore and Storage directly. Do not
-create service-account key files. Configure API CORS for the exact gallery
-origin, request/rate limits, retention/deletion policy, and audit logging.
-Every submission and review route must verify identity and role
-server-side; only the approved-media/catalog read route may be anonymous.
+All commands below are an implementation checklist, **not commands already run**. First confirm the project identity and account as above. These steps enable only Firebase Auth/Firestore/rules, Cloud Storage, Cloud Run, and Cloud Build services required for this design.
 
-## Setup checklist before enabling submissions
+1. Enable APIs in the verified project:
 
-1. Confirm the production GCP project, gallery origin(s), API hostname, and
-   data-retention policy.
-2. Enable Firebase Authentication in that project; choose sign-in method(s)
-   and create Patrick's and the parent's accounts. Define a trusted,
-   server-side process for assigning/removing `submitter`/`reviewer` custom
-   claims. Never grant the reviewer role from browser code.
-3. Create a private pending-review bucket/prefix and a separate
-   approved-media bucket/prefix. Set lifecycle deletion for
-   rejected/abandoned submissions. Keep public read limited to approved
-   output only.
-4. Create Firestore collections/rules so clients cannot read or write
-   submissions directly. Add server-side status validation and an audit
-   record for every approval/rejection.
-5. Implement and deploy the Cloud Run API: Firebase ID-token verification,
-   role checks, independent format/dimension/size validation, server-side
-   re-encoding/metadata stripping, and the pending → review → publish flow
-   above. Build an authenticated parent review interface (not included in
-   this frontend draft).
-6. Configure exact-origin CORS, rate limits, monitoring, error handling,
-   backup/deletion policy, and least-privilege runtime IAM. Test anonymous
-   submission, oversized/spoofed files, direct access to pending objects,
-   and approval attempts by a non-reviewer account - all must fail.
-7. Add the Firebase web configuration and API origin as deployment-time Vite
-   settings (for example `VITE_FIREBASE_*`, `VITE_ARTWORK_API_URL`). Firebase
-   web configuration is public client configuration, not a secret; all
-   administrative credentials stay server-side. Rebuild and deploy only
-   after environment-specific values and security rules have been reviewed.
-8. Wire `ArtworkUploadGateway`/`ArtworkReviewGateway` to the real endpoints
-   and enable the "Send for parent approval" button. Verify a submission is
-   invisible to the public catalog before approval and appears only after
-   approval. Until these checks pass, keep the button disabled and the
-   current static gallery unchanged.
+   ```sh
+   gcloud services enable \
+     run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
+     storage.googleapis.com firestore.googleapis.com firebase.googleapis.com \
+     identitytoolkit.googleapis.com firebaserules.googleapis.com \
+     --project=gallery-app-457314
+   ```
 
-No cloud resources, settings, accounts, credentials, or deployment
-configuration have been created or changed by this draft.
+2. Create Firestore Native `(default)` in the agreed region only if it does not already exist. Apply `firestore.rules` with Firebase CLI (`npx firebase-tools login`, then `npx firebase-tools deploy --only firestore:rules --project gallery-app-457314`). These rules deny every direct client read/write; the API uses its narrowly scoped service identity and the Admin SDK. Enable Firestore TTL on the `submissions.expiresAt` field:
+
+   ```sh
+   gcloud firestore fields ttls update expiresAt \
+     --collection-group=submissions --enable-ttl \
+     --database='(default)' --project=gallery-app-457314
+   ```
+
+   Firestore TTL deletion is asynchronous. The storage lifecycle is the media-retention backstop.
+
+3. Create both buckets in the agreed region with uniform bucket-level access. Enforce public-access prevention on the pending bucket and apply `infra/pending-lifecycle.json`. The approved bucket contains only already-approved optimized images and has public object read; add only `allUsers:roles/storage.objectViewer` there. If organization policy rejects that binding, stop; do not weaken organization policy or expose pending objects.
+4. Create a dedicated runtime service account. Grant it `roles/datastore.user` for Firestore; `roles/storage.objectAdmin` scoped only to the private pending bucket; and `roles/storage.objectViewer` plus `roles/storage.objectCreator` scoped only to the approved bucket. `roles/firebaseauth.viewer` is needed for revoked/disabled-token checks. Do not create key files. Use an exact-origin `GALLERY_ORIGIN=https://patrick.tolan.ie`.
+5. Deploy the API from `api/` with Node 22 and `min=0`, `max=2`, one CPU, 1 GiB memory, concurrency 1, and a request timeout suitable for image re-encoding. It must be reachable by the browser, so Cloud Run ingress is public, but every submit/review route requires a verified Firebase ID token and server-side role check. `/api/gallery` is the only anonymous API route. Set `GCP_PROJECT_ID`, bucket names, exact origin, and the two email allowlist values as runtime configuration.
+6. Record the actual Cloud Run URL. Build the frontend with `VITE_ARTWORK_API_URL` and Firebase web config. Keep `VITE_ARTWORK_UPLOAD_ENABLED=false` during setup.
+7. Before enabling uploads, test with the real Firebase accounts: anonymous submission gets 401; an incorrect account and submitter cannot review/approve; claimed MIME spoof and per-file/body size excess are rejected by the API; pending URLs cannot be fetched publicly; approve publishes and exposes only sanitized media in the approved catalog; reject moves the object to `rejected/`; lifecycle deletes pending/rejected media after 14 days. Then deploy the static gallery update without removing/changing the existing live gallery and set `VITE_ARTWORK_UPLOAD_ENABLED=true` only after those checks pass.
+
+Cloud Run's minimum instance count is zero, so no API container stays warm between requests. This does not eliminate Cloud Storage, Firestore, build, network, or request charges. No live settings have been changed in this workspace.

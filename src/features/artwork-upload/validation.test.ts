@@ -69,10 +69,10 @@ describe('validateOptimizedPhoto', () => {
     ).toEqual({ valid: true })
   })
 
-  it('rejects an optimized photo over the upload limit', () => {
+  it('rejects an optimized photo over the 4 MB upload limit', () => {
     expect(
       validateOptimizedPhoto({ sizeBytes: MAX_OPTIMIZED_FILE_SIZE + 1, mimeType: 'image/jpeg' }),
-    ).toMatchObject({ valid: false, reason: expect.stringContaining('8 MB') })
+    ).toMatchObject({ valid: false, reason: expect.stringContaining('4 MB') })
   })
 
   it('rejects an empty optimized photo', () => {

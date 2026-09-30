@@ -19,9 +19,11 @@ export interface PendingArtworkSubmission {
 
 export interface PendingArtworkReview {
   id: string
+  status: 'pending_review' | 'publishing'
   title: string
   note: string
   submittedAt: string
+  images: Array<{ id: string; width: number; height: number }>
 }
 
 export type ArtworkReviewDecision = 'approve' | 'reject'
@@ -42,6 +44,7 @@ export interface ArtworkUploadGateway {
 
 export interface ArtworkReviewGateway {
   listPending(identityToken: string): Promise<PendingArtworkReview[]>
+  loadPendingImage(submissionId: string, imageId: string, identityToken: string): Promise<Blob>
   decide(
     submissionId: string,
     decision: ArtworkReviewDecision,

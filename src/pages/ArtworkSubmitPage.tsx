@@ -11,6 +11,10 @@ import {
   Typography,
 } from '@mui/material'
 import { Link } from 'react-router-dom'
+import { AuthProvider } from '../features/auth/AuthContext'
+import { GoogleAccountPanel } from '../features/auth/GoogleAccountPanel'
+import { useAuth } from '../features/auth/auth-context'
+import { artworkUploadGateway } from '../features/artwork-upload/client'
 import type { ArtworkDraftPhoto } from '../features/artwork-upload/contracts'
 import { optimizeArtworkPhoto, type OptimizedArtworkPhoto } from '../features/artwork-upload/resize'
 import {
@@ -31,19 +35,27 @@ interface DraftPhotoEntry {
 
 let nextEntryId = 0
 
-export function ArtworkSubmitPage() {
+function ArtworkSubmitContent() {
+  const { user } = useAuth()
   const [entries, setEntries] = useState<DraftPhotoEntry[]>([])
   const [title, setTitle] = useState('')
   const [note, setNote] = useState('')
   const [selectionError, setSelectionError] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [submissionId, setSubmissionId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const titleFieldId = useId()
   const entriesRef = useRef(entries)
+  const mountedRef = useRef(false)
+  const cancelledEntriesRef = useRef(new Set<string>())
   entriesRef.current = entries
 
   // Revoke every remaining preview object URL when the page unmounts, since
   // those URLs reference the optimized blobs kept only in this page's memory.
   useEffect(() => {
+    mountedRef.current = true
     return () => {
+      mountedRef.current = false
       for (const entry of entriesRef.current) {
         if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl)
       }
@@ -96,6 +108,7 @@ export function ArtworkSubmitPage() {
       // resized, metadata-stripped output below is kept.
       optimizeArtworkPhoto(file)
         .then((optimized) => {
+          if (!mountedRef.current || cancelledEntriesRef.current.has(id)) return
           const outputValidation = validateOptimizedPhoto(optimized)
           if (!outputValidation.valid) {
             setEntries((current) =>
@@ -116,6 +129,7 @@ export function ArtworkSubmitPage() {
           )
         })
         .catch((error: unknown) => {
+          if (!mountedRef.current || cancelledEntriesRef.current.has(id)) return
           const message = error instanceof Error ? error.message : 'Could not process this photo.'
           setEntries((current) =>
             current.map((entry) => (entry.id === id ? { ...entry, status: 'error', error: message } : entry)),
@@ -125,6 +139,7 @@ export function ArtworkSubmitPage() {
   }
 
   const removeEntry = (id: string) => {
+    cancelledEntriesRef.current.add(id)
     setEntries((current) => {
       const entry = current.find((item) => item.id === id)
       if (entry?.previewUrl) URL.revokeObjectURL(entry.previewUrl)
@@ -133,7 +148,35 @@ export function ArtworkSubmitPage() {
   }
 
   const isOptimizing = entries.some((entry) => entry.status === 'optimizing')
-  const draftIsReady = readyPhotos.length > 0 && title.trim().length > 0 && !isOptimizing
+  const hasErrors = entries.some((entry) => entry.status === 'error')
+  const apiConfigured = Boolean(import.meta.env.VITE_ARTWORK_API_URL)
+  const uploadEnabled = apiConfigured && import.meta.env.VITE_ARTWORK_UPLOAD_ENABLED === 'true'
+  const draftIsReady = readyPhotos.length > 0 && title.trim().length > 0 && !isOptimizing && !hasErrors
+  const canSubmit = draftIsReady && Boolean(user) && uploadEnabled && !submitting
+
+  const submitDraft = async () => {
+    if (!user || !canSubmit) return
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      const identityToken = await user.getIdToken()
+      const result = await artworkUploadGateway.submitDraft(
+        { title: title.trim(), note: note.trim(), photos: readyPhotos },
+        identityToken,
+      )
+      setSubmissionId(result.id)
+      for (const entry of entries) {
+        if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl)
+      }
+      setEntries([])
+      setTitle('')
+      setNote('')
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Photo submission failed.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <Container maxWidth="sm" sx={{ py: 3 }}>
@@ -142,22 +185,34 @@ export function ArtworkSubmitPage() {
           <Typography variant="h5" component="h1">
             Submit photos
           </Typography>
-          <Button component={Link} to="/" size="small">
-            Back to gallery
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button component={Link} to="/review" size="small">
+              Parent review
+            </Button>
+            <Button component={Link} to="/" size="small">
+              Gallery
+            </Button>
+          </Stack>
         </Stack>
 
         <Alert severity="info">
-          Photos you submit here are private until a parent reviews and approves them - they will
-          not appear on the gallery automatically.
+          When connected to the private upload service, your photos stay private until a parent
+          reviews and approves them. A pending or rejected photo never appears in the gallery.
         </Alert>
 
-        <Alert severity="warning">
-          Submitting is not connected to a live backend yet: this page prepares and optimizes your
-          photos, but the private upload/review service still needs to be deployed. See{' '}
-          <code>README-ARTWORK-UPLOAD.md</code> for the exact setup steps. No photo leaves this
-          device yet.
-        </Alert>
+        <GoogleAccountPanel />
+        {!apiConfigured && (
+          <Alert severity="warning">
+            The private upload service is not configured in this build. Photos stay on this device
+            and the submit button is disabled.
+          </Alert>
+        )}
+        {apiConfigured && !uploadEnabled && (
+          <Alert severity="warning">
+            Uploads remain disabled until the deployed API passes the documented security and
+            approval checks. No photo leaves this device yet.
+          </Alert>
+        )}
 
         <TextField
           id={titleFieldId}
@@ -209,11 +264,17 @@ export function ArtworkSubmitPage() {
 
         <Typography variant="body2" color="text.secondary">
           Camera photos up to 25 MB are accepted. Each is resized to at most 2560px on the longest
-          side and re-encoded before upload, which also removes location and other metadata. Only
+          side and re-encoded below 4 MB before upload, which also removes location and other metadata. Only
           the resized copy is ever kept or sent - the original file is discarded on this device.
         </Typography>
 
         {selectionError && <Alert severity="error">{selectionError}</Alert>}
+        {submitError && <Alert severity="error">{submitError}</Alert>}
+        {submissionId && (
+          <Alert severity="success">
+            Sent for parent approval. Reference: {submissionId}. It is not public until approved.
+          </Alert>
+        )}
 
         {entries.map((entry) => (
           <Stack
@@ -260,17 +321,26 @@ export function ArtworkSubmitPage() {
         <Button
           variant="contained"
           size="large"
-          disabled
-          title="Sending is disabled until the private upload backend in README-ARTWORK-UPLOAD.md is deployed"
+          disabled={!canSubmit}
+          onClick={() => void submitDraft()}
+          title={uploadEnabled ? 'Send optimized photos for parent approval' : 'Requires deployed and verified upload service'}
         >
-          Send for parent approval
+          {submitting ? 'Sending…' : 'Send for parent approval'}
         </Button>
-        {draftIsReady && (
+        {draftIsReady && !uploadEnabled && (
           <Typography variant="body2" color="text.secondary">
-            This draft is ready to send once the upload backend is deployed and connected.
+            This draft is ready to send once the private upload backend is deployed and verified.
           </Typography>
         )}
       </Stack>
     </Container>
+  )
+}
+
+export function ArtworkSubmitPage() {
+  return (
+    <AuthProvider>
+      <ArtworkSubmitContent />
+    </AuthProvider>
   )
 }

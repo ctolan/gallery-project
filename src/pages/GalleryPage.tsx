@@ -1,7 +1,9 @@
-import { Container, Dialog, DialogContent, DialogTitle, Stack } from '@mui/material'
-import { useState } from 'react'
+import { Alert, Container, Dialog, DialogContent, DialogTitle, Stack } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ImageGallery } from '../components/ImageGallery'
+import { loadApprovedGallery } from '../features/artwork-upload/client'
+import type { ApprovedGalleryItem } from '../features/artwork-upload/client'
 
 // Using local images from public/images folder
 const galleryImages = [
@@ -12,6 +14,39 @@ const galleryImages = [
 
 export function GalleryPage() {
   const [selectedImage, setSelectedImage] = useState<{ id: string; url: string; title: string } | null>(null)
+  const [approvedItems, setApprovedItems] = useState<ApprovedGalleryItem[]>([])
+  const [approvedItemsError, setApprovedItemsError] = useState('')
+
+  useEffect(() => {
+    if (!import.meta.env.VITE_ARTWORK_API_URL) return
+    let cancelled = false
+    loadApprovedGallery()
+      .then((items) => {
+        if (!cancelled) setApprovedItems(items)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setApprovedItemsError(error instanceof Error ? error.message : 'Approved photos could not be loaded.')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const images = useMemo(
+    () => [
+      ...galleryImages,
+      ...approvedItems.flatMap((item) =>
+        item.images.map((image) => ({
+          id: `approved-${item.id}-${image.id}`,
+          url: image.url,
+          title: item.title,
+        })),
+      ),
+    ],
+    [approvedItems],
+  )
 
   const handleImageClick = (image: { id: string; url: string; title: string }) => {
     setSelectedImage(image)
@@ -33,7 +68,8 @@ export function GalleryPage() {
           Submit photos
         </Link>
       </Stack>
-      <ImageGallery images={galleryImages} onImageClick={handleImageClick} />
+      {approvedItemsError && <Alert severity="error" sx={{ mb: 2 }}>{approvedItemsError}</Alert>}
+      <ImageGallery images={images} onImageClick={handleImageClick} />
 
       <Dialog
         open={!!selectedImage}

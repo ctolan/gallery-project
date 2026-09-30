@@ -31,6 +31,8 @@ npm-debug.log
 .env
 *.env
 *.secret
+!api/.env.example
+!.env.example
 credentials*.json
 service-account*.json
 *.pem
