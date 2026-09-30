@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithRedirect,
+  signInWithPopup,
   signOut as firebaseSignOut,
-  getRedirectResult,
   type User,
 } from 'firebase/auth'
 import { firebaseAuth, firebaseConfigured } from './firebase'
@@ -21,16 +20,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const unsubscribe = onAuthStateChanged(firebaseAuth, setUser, () => {
-      setError('Unable to check Google sign-in state.')
-      setLoading(false)
-    })
-    getRedirectResult(firebaseAuth)
-      .then((result) => {
-        if (result?.user) setUser(result.user)
-      })
-      .catch(() => setError('Google sign-in could not be completed. Please try again.'))
-      .finally(() => setLoading(false))
+    const unsubscribe = onAuthStateChanged(
+      firebaseAuth,
+      (nextUser) => {
+        setUser(nextUser)
+        setLoading(false)
+      },
+      () => {
+        setError('Unable to check Google sign-in state.')
+        setLoading(false)
+      },
+    )
 
     return unsubscribe
   }, [])
@@ -41,9 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const provider = new GoogleAuthProvider()
     provider.setCustomParameters({ prompt: 'select_account' })
     try {
-      await signInWithRedirect(firebaseAuth, provider)
+      // A popup keeps sign-in on a single page load, avoiding the
+      // full-page redirect's storage-bounce through the custom authDomain
+      // (which mobile browsers with partitioned/blocked third-party
+      // storage can fail to persist, causing an endless sign-in loop).
+      const result = await signInWithPopup(firebaseAuth, provider)
+      setUser(result.user)
     } catch {
-      setError('Unable to start Google sign-in.')
+      setError('Unable to complete Google sign-in. Please allow pop-ups and try again.')
     }
   }, [])
 
