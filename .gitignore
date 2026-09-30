@@ -31,11 +31,13 @@ npm-debug.log
 .env
 *.env
 *.secret
+!.env.example
 credentials*.json
 service-account*.json
 *.pem
 *.key
 .env.*
+!api/.env.example
 
 # Build / output
 dist/

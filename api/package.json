@@ -1,0 +1,21 @@
+{
+  "name": "gallery-artwork-api",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase-admin": "^13.4.0",
+    "multer": "^2.0.2",
+    "sharp": "^0.35.5"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}
