@@ -15,9 +15,8 @@ const invalidIdentityCodes = new Set([
   'auth/user-not-found',
 ])
 
-function publicObjectUrl(bucketName, objectPath) {
-  const encodedPath = objectPath.split('/').map(encodeURIComponent).join('/')
-  return `https://storage.googleapis.com/${bucketName}/${encodedPath}`
+function publicImageUrl(apiOrigin, submissionId, imageId) {
+  return `${apiOrigin}/api/gallery/${encodeURIComponent(submissionId)}/images/${encodeURIComponent(imageId)}`
 }
 
 function createUploadMiddleware() {
@@ -175,12 +174,40 @@ export function createApp({
           title: submission.title,
           images: submission.images.map((image) => ({
             id: image.id,
-            url: publicObjectUrl(config.approvedBucketName, image.approvedObjectPath),
+            url: publicImageUrl(config.publicApiOrigin, submission.id, image.id),
             width: image.width,
             height: image.height,
           })),
         }))
       response.json({ items })
+    } catch (error) {
+      next(error)
+    }
+  })
+
+  app.get('/api/gallery/:submissionId/images/:imageId', async (request, response, next) => {
+    try {
+      const submission = await findSubmission(db, request.params.submissionId)
+      if (!submission || submission.status !== 'approved') {
+        response.status(404).json({ error: 'Approved photo was not found.' })
+        return
+      }
+
+      const image = submission.images.find((item) => item.id === request.params.imageId)
+      if (
+        !image?.approvedObjectPath ||
+        !image.approvedObjectPath.startsWith(`approved/${request.params.submissionId}/`)
+      ) {
+        response.status(404).json({ error: 'Approved photo was not found.' })
+        return
+      }
+
+      const [buffer] = await approvedBucket.file(image.approvedObjectPath).download()
+      response
+        .type('image/jpeg')
+        .set('Cache-Control', 'public, max-age=3600')
+        .set('X-Content-Type-Options', 'nosniff')
+        .send(buffer)
     } catch (error) {
       next(error)
     }

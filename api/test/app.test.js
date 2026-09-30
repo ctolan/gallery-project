@@ -9,6 +9,7 @@ const config = {
   pendingBucketName: 'pending-test',
   approvedBucketName: 'approved-test',
   galleryOrigin: 'https://gallery.test',
+  publicApiOrigin: 'https://api.gallery.test',
   submitterEmail: 'patrick@example.test',
   reviewerEmail: 'parent@example.test',
 }
@@ -326,6 +327,8 @@ describe('artwork API access and review workflow', () => {
     const pendingImage = [...db.collection('submissions').records.get(id).images][0]
     const access = await request(`/api/review/submissions/${id}/images/${pendingImage.id}`)
     assert.equal(access.status, 401)
+    const publicAccess = await request(`/api/gallery/${id}/images/${pendingImage.id}`)
+    assert.equal(publicAccess.status, 404)
   })
 
   it('publishes only after reviewer approval and approval is idempotent', async () => {
@@ -348,7 +351,29 @@ describe('artwork API access and review workflow', () => {
     const { items } = await gallery.json()
     assert.equal(items.length, 1)
     assert.equal(items[0].id, id)
-    assert.match(items[0].images[0].url, /approved-test\/approved\//)
+    assert.equal(
+      items[0].images[0].url,
+      `https://api.gallery.test/api/gallery/${id}/images/${items[0].images[0].id}`,
+    )
+    const imageUrl = `/api/gallery/${id}/images/${items[0].images[0].id}`
+    const publicImage = await request(imageUrl)
+    assert.equal(publicImage.status, 200)
+    assert.equal(publicImage.headers.get('content-type'), 'image/jpeg')
+    assert.match(publicImage.headers.get('cache-control'), /public.*max-age=3600/)
+
+    const otherSubmission = await submitPhoto()
+    const { id: rejectedSubmissionId } = await otherSubmission.json()
+    const rejectedImageId = db.collection('submissions')
+      .records.get(rejectedSubmissionId).images[0].id
+    await request(`/api/review/submissions/${rejectedSubmissionId}/decision`, {
+      method: 'POST',
+      headers: reviewerHeaders,
+      body: JSON.stringify({ decision: 'reject' }),
+    })
+    const rejectedPublicImage = await request(
+      `/api/gallery/${rejectedSubmissionId}/images/${rejectedImageId}`,
+    )
+    assert.equal(rejectedPublicImage.status, 404)
 
     const repeated = await request(decisionUrl, {
       method: 'POST',
@@ -357,7 +382,7 @@ describe('artwork API access and review workflow', () => {
     })
     assert.equal(repeated.status, 200)
     assert.equal(approvedBucket.objects.size, 1)
-    assert.equal(db.collection('artworkAudit').records.size, 3)
+    assert.equal(db.collection('artworkAudit').records.size, 5)
   })
 
   it('moves rejected photos to private rejected storage and keeps them out of the gallery', async () => {

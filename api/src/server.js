@@ -12,6 +12,7 @@ function readConfig(environment = process.env) {
     'APPROVED_BUCKET',
     'ARTWORK_DATABASE_ID',
     'GALLERY_ORIGIN',
+    'PUBLIC_API_ORIGIN',
     'SUBMITTER_EMAIL',
     'REVIEWER_EMAIL',
   ]
@@ -23,6 +24,11 @@ function readConfig(environment = process.env) {
   const galleryOrigin = new URL(environment.GALLERY_ORIGIN).origin
   if (galleryOrigin !== environment.GALLERY_ORIGIN || !galleryOrigin.startsWith('https://')) {
     throw new Error('GALLERY_ORIGIN must be an HTTPS origin without a path or trailing slash.')
+  }
+
+  const publicApiOrigin = new URL(environment.PUBLIC_API_ORIGIN).origin
+  if (publicApiOrigin !== environment.PUBLIC_API_ORIGIN || !publicApiOrigin.startsWith('https://')) {
+    throw new Error('PUBLIC_API_ORIGIN must be an HTTPS origin without a path or trailing slash.')
   }
 
   const submitterEmail = environment.SUBMITTER_EMAIL.trim().toLowerCase()
@@ -51,6 +57,7 @@ function readConfig(environment = process.env) {
     approvedBucketName: environment.APPROVED_BUCKET,
     artworkDatabaseId: environment.ARTWORK_DATABASE_ID,
     galleryOrigin,
+    publicApiOrigin,
     submitterEmail,
     reviewerEmail,
     port,
