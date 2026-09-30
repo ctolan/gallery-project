@@ -49,16 +49,16 @@ Google Sign-In provider state was verified enabled through Identity Toolkit, and
 
 The remaining callback error is explained by the Google OAuth Web client configuration: the client currently has only the Firebase-generated origin/callback. A non-authenticating probe to Google's OAuth endpoint accepts `https://gallery-app-457314.firebaseapp.com/__/auth/handler` but rejects `https://patrick.tolan.ie/__/auth/handler` (redirects to Google's OAuth error endpoint). Firebase's redirect best-practices require adding the custom callback URI to the OAuth provider's authorized redirect URIs. The app's `authDomain`/proxy configuration alone is insufficient.
 
-In [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials?project=gallery-app-457314), edit the Firebase Google provider's Web OAuth client (client ID `151307084226-rq2ekpv7hik20jfcu85aa9v234gvic97.apps.googleusercontent.com`) and add:
+The user added, in Google Cloud Console → APIs & Services → Credentials, to the Firebase Google provider's Web OAuth client (client ID `151307084226-rq2ekpv7hik20jfcu85aa9v234gvic97.apps.googleusercontent.com`):
 
 - Authorized JavaScript origin: `https://patrick.tolan.ie`
 - Authorized redirect URI: `https://patrick.tolan.ie/__/auth/handler`
 
-Keep the existing `https://gallery-app-457314.firebaseapp.com` origin and `https://gallery-app-457314.firebaseapp.com/__/auth/handler` redirect URI. The OAuth client redirect/origin settings could not be changed with the available supported `gcloud`/Firebase APIs and require the Cloud Console. After saving, re-test redirect sign-in and navigation from `/submit` to `/review` in the mobile browser. The support-email value could not be independently confirmed; verify it is `ctolan@gmail.com` in Firebase Authentication settings if that address should be used. The API rejects anonymous writes; both storage buckets remain private; approved images are served through the approval-checking API proxy.
+(alongside the existing `https://gallery-app-457314.firebaseapp.com` origin/callback). **Fix confirmed on 2026-09-30**: the same non-authenticating probe used to diagnose the issue now shows Google's OAuth endpoint accepting `https://patrick.tolan.ie/__/auth/handler` (redirects back to the handler with `interaction_required`, the expected result for a no-session probe) instead of redirecting to Google's OAuth error page. No submissions or authenticated requests reached the API in the window after this fix was applied, so end-to-end sign-in persistence and a real submission still need to be exercised in the mobile browser.
 
 ## Remaining steps
 
-1. Add the custom origin and redirect URI to the Firebase Google provider's Web OAuth client as described above. Then confirm sign-in persists across `/submit` to `/review` on the user's mobile browser and verify the first authenticated upload, reviewer decision, and approved-photo visibility through the API proxy.
+1. Retry Google sign-in and navigation from `/submit` to `/review` on the mobile browser to confirm session persistence, then verify the first authenticated upload, reviewer decision, and approved-photo visibility through the API proxy. (OAuth redirect URI configuration is done; this step still needs a live human test.)
 2. Replace the temporary same-account allowlist with Patrick's and the parent's separate Google accounts before relying on the independent approval boundary. For the explicitly authorized initial live test, `ctolan@gmail.com` is configured as both submitter and reviewer, which permits self-approval.
 
 Both buckets remain private. No public bucket grant is needed for gallery display: the API proxy serves approved images only. Do not add a public object grant. `cloudbuild.gallery.yaml` defaults to `patrick.tolan.ie` as the Firebase auth domain and `VITE_ARTWORK_UPLOAD_ENABLED=false`; override the latter to `true` only for an explicitly authorized live test.
