@@ -12,11 +12,11 @@
 - Firestore rules deny all direct client access. `infra/pending-lifecycle.json` configures the 14-day storage lifecycle for both `pending/` and `rejected/` prefixes.
 - Automated tests cover unauthenticated submission rejection, server-side byte limits and MIME/content spoofing, non-reviewer approval rejection, pending-media privacy, idempotent review transitions, rejected expiry metadata, approval-only public catalog visibility, image resize/re-encoding, and metadata removal.
 
-**Not enabled in the frontend:** `VITE_ARTWORK_UPLOAD_ENABLED` remains `false`, and no frontend deployment has been made. The Cloud Run API is live at the URL below. Client limits are only usability checks; a malicious client can bypass them. The API independently enforces actual type, file size, pixel count, dimensions/output encoding, role, and request constraints.
+**Frontend deployed; submissions disabled:** The frontend is live on `https://patrick.tolan.ie` with Firebase and API configuration, but `VITE_ARTWORK_UPLOAD_ENABLED=false` is baked into the build and the Send button is disabled. Authenticated end-to-end submission/approval has not been verified. Client limits are only usability checks; a malicious client can bypass them. The API independently enforces actual type, file size, pixel count, dimensions/output encoding, role, and request constraints.
 
-## Provisioning state — API deployed; frontend and authenticated E2E remain gated
+## Provisioning state — API and frontend deployed; submissions remain gated
 
-On 2026-09-30, `ctolan@gmail.com` verified project `gallery-app-457314` (`Gallery-app`, ACTIVE; project number `151307084226`) and Owner access. Firebase project registration and the isolated storage/database resources are complete. Google sign-in is enabled and verified through Identity Toolkit. The API and private approved-image proxy are deployed. The frontend remains disabled and the live gallery has not been changed.
+On 2026-09-30, `ctolan@gmail.com` verified project `gallery-app-457314` (`Gallery-app`, ACTIVE; project number `151307084226`) and Owner access. Firebase project registration and the isolated storage/database resources are complete. Google sign-in is enabled and verified through Identity Toolkit. The API and private approved-image proxy are deployed. The frontend is deployed to the existing Cloud Run production service at `https://patrick.tolan.ie`; photo submission remains disabled pending authenticated end-to-end verification.
 
 | Resource | Current state |
 |---|---|
@@ -31,9 +31,9 @@ On 2026-09-30, `ctolan@gmail.com` verified project `gallery-app-457314` (`Galler
 | Approved-media bucket | `gs://gallery-app-457314-artwork-approved`, `europe-west1`, uniform access; private, no public grant; approved images are read through the API proxy |
 | Runtime service account | `artwork-api-runtime@gallery-app-457314.iam.gserviceaccount.com`, no key created |
 | Cloud Run API | `artwork-api`, `europe-west1`; URL `https://artwork-api-4bigtfzbma-ew.a.run.app`; service min instances 0, max 2, 1 CPU, 1 GiB, concurrency 1, 120s timeout; revision `artwork-api-00002-4sz` |
-| Gallery frontend | Not deployed; `VITE_ARTWORK_UPLOAD_ENABLED=false` |
+| Gallery frontend | Cloud Run service `gallery-app`, `us-central1`; production URL `https://patrick.tolan.ie`; revision `gallery-app-00003-qux` (100% traffic); Firebase project and API URL are configured; `VITE_ARTWORK_UPLOAD_ENABLED=false` |
 
-Firebase, Identity Toolkit, Firestore, and Firebase Rules APIs are enabled. Cloud Run, Cloud Build, and Artifact Registry APIs were already enabled. Firebase project registration added Firebase-managed service-agent bindings; no unrelated existing bucket, Firestore database, or live gallery configuration was changed.
+Firebase, Identity Toolkit, Firestore, and Firebase Rules APIs are enabled. Cloud Run, Cloud Build, and Artifact Registry APIs were already enabled. Firebase project registration added Firebase-managed service-agent bindings; provisioning did not change unrelated buckets or Firestore databases. The gallery frontend was subsequently updated only in the explicitly authorized deployment described above.
 
 The existing default database is incompatible with the Firestore SDK workflow and must not be converted, replaced, or used for the artwork API. A separate named Native database keeps the existing US Datastore-mode database untouched. The additional Native database reports `freeTier: false`; expect usage-based Firestore charges rather than assuming the free-tier allowance. Cloud Run will use `min=0`, but that does not eliminate database, storage, build, or network costs.
 
@@ -45,14 +45,14 @@ Cloud Run is publicly invokable so the phone browser can reach it, but applicati
 
 For initial testing only, the user explicitly authorized `ctolan@gmail.com` as both `SUBMITTER_EMAIL` and `REVIEWER_EMAIL`; the deployed API currently uses this configuration. This is temporary and allows the same account to approve its own submissions, so it does **not** provide independent parent review. Before actual family use, change the submitter to Patrick's Google account and the reviewer to the parent's account. The API enforces exact server-side email allowlists, never client-provided roles.
 
-Google Sign-In provider state was verified enabled through Identity Toolkit. The support-email value could not be independently confirmed; verify it is `ctolan@gmail.com` in Firebase Authentication settings if that address should be used. Authenticated live tests still require an actual Firebase ID token obtained by signing in to the Firebase web app. Do not enable the public site's upload control or deploy the frontend without separate approval. To complete E2E testing later, obtain a Firebase ID token through a browser sign-in flow for the configured web app, then use it only in a secure local test (do not put it in source, PR text, or logs). Tests must cover authenticated submission, private pending media, approval-only proxy visibility, rejection privacy, role checks, and validation. The available `gcloud` OAuth token cannot substitute for this Firebase token.
+Google Sign-In provider state was verified enabled through Identity Toolkit. The support-email value could not be independently confirmed; verify it is `ctolan@gmail.com` in Firebase Authentication settings if that address should be used. Authenticated live tests still require an actual Firebase ID token obtained by signing in to the Firebase web app. The production UI is deployed, but its send button is disabled. To complete E2E testing, obtain a Firebase ID token through browser sign-in for the configured web app, then use it only in a secure local test (do not put it in source, PR text, or logs). Tests must cover authenticated submission, private pending media, approval-only proxy visibility, rejection privacy, role checks, and validation. The available `gcloud` OAuth token cannot substitute for this Firebase token.
 
-## Remaining steps — gated by explicit authorization
+## Remaining steps
 
 1. Obtain a real Firebase ID token through a browser sign-in flow and run authenticated live tests against the API. The API is deployed and Google sign-in is verified, but this end-to-end test is not complete.
 2. Replace the temporary same-account allowlist with Patrick's and the parent's separate Google accounts before relying on the independent approval boundary.
-3. Only after explicit authorization, build/deploy the public frontend; leave `VITE_ARTWORK_UPLOAD_ENABLED=false` unless separately authorized to enable submissions. The current frontend deployment is intentionally withheld.
+3. Keep `VITE_ARTWORK_UPLOAD_ENABLED=false` until authenticated end-to-end tests pass and the server allowlist uses distinct submitter/reviewer accounts; then enable submissions only with explicit authorization.
 
-Both buckets must remain private. No public bucket grant is needed for gallery display: the API proxy serves approved images only. Do not add a public object grant or change live frontend settings.
+Both buckets remain private. No public bucket grant is needed for gallery display: the API proxy serves approved images only. Do not add a public object grant.
 
 Cloud Run was built by Cloud Build from the API Dockerfile. The deployed service has min instances 0 and max instances 2, but this does not remove charges for builds, Firestore, storage, image requests, or egress. Project billing is linked; actual spend was not queried. The new Native Firestore database reports `freeTier: false`, so usage-based Firestore charges should be expected.
