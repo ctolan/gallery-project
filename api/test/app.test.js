@@ -286,6 +286,22 @@ describe('artwork API access and review workflow', () => {
     assert.equal(db.collection('submissions').records.size, 0)
   })
 
+  it('lists pending submissions whose timestamps are Firestore Timestamps', async () => {
+    const { id } = await (await submitPhoto()).json()
+    const record = db.collection('submissions').records.get(id)
+    const asTimestamp = (date) => ({ toDate: () => date, toMillis: () => date.getTime() })
+    record.createdAt = asTimestamp(record.createdAt)
+    record.expiresAt = asTimestamp(record.expiresAt)
+
+    const listed = await request('/api/review/submissions', {
+      headers: { Authorization: 'Bearer reviewer-token' },
+    })
+    assert.equal(listed.status, 200)
+    const { items } = await listed.json()
+    assert.equal(items.length, 1)
+    assert.match(items[0].submittedAt, /^\d{4}-\d{2}-\d{2}T/)
+  })
+
   it('does not list or approve an expired pending submission', async () => {
     const response = await submitPhoto()
     const { id } = await response.json()

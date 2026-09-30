@@ -112,6 +112,10 @@ async function listSubmissions(db, status) {
 function dateFromFirestore(value) {
   if (value instanceof Date) return value
   if (value && typeof value.toDate === 'function') return value.toDate()
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) return parsed
+  }
   return new Date(0)
 }
 
@@ -168,7 +172,7 @@ export function createApp({
       response.set('Cache-Control', 'no-store')
       const submissions = await listSubmissions(db, 'approved')
       const items = submissions
-        .sort((left, right) => right.approvedAt.toMillis() - left.approvedAt.toMillis())
+        .sort((left, right) => dateFromFirestore(right.approvedAt).getTime() - dateFromFirestore(left.approvedAt).getTime())
         .map((submission) => ({
           id: submission.id,
           title: submission.title,
@@ -302,7 +306,7 @@ export function createApp({
             status: submission.status,
             title: submission.title,
             note: submission.note,
-            submittedAt: submission.createdAt.toISOString(),
+            submittedAt: dateFromFirestore(submission.createdAt).toISOString(),
             images: submission.images.map(({ id, width, height }) => ({ id, width, height })),
           })),
         })
