@@ -18,7 +18,7 @@ Workflow - add new images locally
      { id: '3', url: '/images/20250920_090846.jpg', title: 'New Image 3' },
    ];
 
-This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented. Firebase Google sign-in is enabled and verified; approved photos are served through the API while both buckets stay private. The frontend is still undeployed and sending disabled pending authenticated end-to-end checks and separate authorization. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
+This repository workflow is for trusted maintainers changing the site bundle. Do not use it for Patrick's photo submissions: files in `public/` are published with the site and do not have an approval gate. The mobile `/submit` and parent `/review` routes and secured API are implemented. Firebase Google sign-in is enabled and verified; approved photos are served through the API while both buckets stay private. The frontend is deployed to the existing `gallery-app` Cloud Run service (`us-central1`, revision `gallery-app-00007-mex`); submissions are enabled for the authorized live test. Firebase auth helper paths use a same-origin proxy on `patrick.tolan.ie`. See [Artwork upload integration](README-ARTWORK-UPLOAD.md).
 
 Local testing
 - Install dependencies (if needed):
@@ -65,18 +65,21 @@ gcloud app deploy --quiet
 
 Notes: App Engine was used for a quick static deployment earlier, but Cloud Run was chosen for the final service in this session.
 
-Deploy to Cloud Run (recommended for this project)
-1. Build a container image and push to Google Container Registry (replace PROJECT_ID):
+Deploy to Cloud Run (existing production service)
+
+The production gallery is the `gallery-app` Cloud Run service in `gallery-app-457314`, region `us-central1`, behind `patrick.tolan.ie`. The current production revision is `gallery-app-00007-mex`. `cloudbuild.gallery.yaml` builds the Vite app with supplied Firebase web-app configuration, defaults `VITE_FIREBASE_AUTH_DOMAIN=patrick.tolan.ie`, sets `VITE_ARTWORK_API_URL=https://artwork-api-4bigtfzbma-ew.a.run.app`, and defaults `VITE_ARTWORK_UPLOAD_ENABLED=false`. The Firebase API key is public client configuration, not a server credential. The current live-test build explicitly overrode the upload flag to `true`. Nginx proxies `/__/auth/*` to the Firebase project domain so redirect-auth storage uses the gallery origin. Smoke-test a tagged no-traffic revision at `/`, `/submit`, `/review`, and `/__/auth/iframe` before directing service traffic to it.
+
+Historical deployment commands (do not run as-is; verify image/build settings and current service configuration first):
 
 ```powershell
 # from project root
-gcloud builds submit --tag gcr.io/PROJECT_ID/gallery-app
+gcloud builds submit --tag gcr.io/gallery-app-457314/gallery-app
 ```
 
 2. Deploy to Cloud Run:
 
 ```powershell
-gcloud run deploy gallery-app --image gcr.io/PROJECT_ID/gallery-app --platform managed --region us-central1 --allow-unauthenticated
+gcloud run deploy gallery-app --image gcr.io/gallery-app-457314/gallery-app --region us-central1 --no-traffic
 ```
 
 3. Confirm the service URL returned by the deploy command and open it to verify the updated site.
